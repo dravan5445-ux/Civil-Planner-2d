@@ -111,6 +111,24 @@
 </div>
 
 <script>
+    
+    function drawDoor(ctx,x,y){
+
+    ctx.beginPath();
+
+    ctx.moveTo(x,y);
+
+    ctx.lineTo(x+25,y);
+
+    ctx.stroke();
+
+    ctx.beginPath();
+
+    ctx.arc(x,y,25,0,Math.PI/2);
+
+    ctx.stroke();
+
+}
 
 function generatePlan(){
 
@@ -165,7 +183,8 @@ if(houseType==="1 BHK"){
 if(houseType==="2 BHK" || houseType==="3 BHK" || houseType==="4 BHK"){
 
     ctx.strokeRect(20,140,180,80);
-    ctx.fillText("Bedroom 1",70,185);
+    ctx.fillText("Bedroom 1",60,170);
+    ctx.fillText("12' x 12'",65,190);
 
     ctx.strokeRect(220,140,180,80);
     ctx.fillText("Bedroom 2",270,185);
