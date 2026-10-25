@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI House Plan Generator</title>
+
+    <style>
+
+        body{
+            font-family:Arial;
+            text-align:center;
+            background:#f4f4f4;
+            margin:0;
+            padding:50px;
+        }
+
+        .container{
+            background:white;
+            max-width:600px;
+            margin:auto;
+            padding:30px;
+            border-radius:10px;
+            box-shadow:0px 0px 10px rgba(0,0,0,.1);
+        }
+
+        input{
+            width:90%;
+            padding:10px;
+            margin:10px;
+        }
+
+        button{
+            background:#0078d4;
+            color:white;
+            border:none;
+            padding:12px 20px;
+            cursor:pointer;
+            border-radius:5px;
+        }
+
+        canvas{
+            margin-top:20px;
+            border:1px solid black;
+            background:white;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🏠 AI House Plan Generator</h1>
+
+    <p>Enter plot dimensions</p>
+
+    <input id="width" type="number" placeholder="Plot Width">
+
+    <input id="height" type="number" placeholder="Plot Length">
+
+    <br>
+
+    <button onclick="drawPlan()">
+        Generate Plan
+    </button>
+
+    <br><br>
+
+    <canvas id="plan" width="500" height="500"></canvas>
+
+</div>
+
+<script>
+
+function drawPlan(){
+
+    let w=document.getElementById("width").value;
+    let h=document.getElementById("height").value;
+
+    let canvas=document.getElementById("plan");
+    let ctx=canvas.getContext("2d");
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    ctx.strokeRect(50,50,400,350);
+
+    ctx.strokeRect(50,50,200,150);
+    ctx.fillText("Bedroom",120,130);
+
+    ctx.strokeRect(250,50,200,150);
+    ctx.fillText("Bedroom",320,130);
+
+    ctx.strokeRect(50,200,400,100);
+    ctx.fillText("Hall",230,250);
+
+    ctx.strokeRect(50,300,200,100);
+    ctx.fillText("Kitchen",120,350);
+
+    ctx.strokeRect(250,300,200,100);
+    ctx.fillText("Bathroom",300,350);
+
+    ctx.fillText("Plot: "+w+" x "+h+" ft",170,25);
+}
+
+</script>
+
+</body>
+</html>
