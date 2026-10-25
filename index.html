@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>AI House Plan Generator</title>
+    <title>AI Civil Planner 2D</title>
 
     <style>
 
@@ -55,13 +55,49 @@
 
     <p>Enter plot dimensions</p>
 
-    <input id="width" type="number" placeholder="Plot Width">
+    <input id="plotLength" type="number" placeholder="Plot Length (ft)">
 
-    <input id="height" type="number" placeholder="Plot Length">
+<input id="plotWidth" type="number" placeholder="Plot Width (ft)">
 
+<select id="houseType">
+    <option>1 RK</option>
+    <option>1 BHK</option>
+    <option>2 BHK</option>
+    <option>3 BHK</option>
+    <option>4 BHK</option>
+</select>
+
+<select id="frontDirection">
+    <option>North Facing</option>
+    <option>South Facing</option>
+    <option>East Facing</option>
+    <option>West Facing</option>
+</select>
+
+<select id="roadDirection">
+    <option>Road North</option>
+    <option>Road South</option>
+    <option>Road East</option>
+    <option>Road West</option>
+</select>
+
+<select id="staircase">
+    <option>Inside Staircase</option>
+    <option>Outside Staircase</option>
+</select>
+
+<select id="attachedBath">
+    <option>Attached Bathroom Required</option>
+    <option>No Attached Bathroom</option>
+</select>
+
+<select id="parking">
+    <option>Parking Required</option>
+    <option>No Parking</option>
+</select>
     <br>
 
-    <button onclick="drawPlan()">
+    <button onclick="generatePlan()">
         Generate Plan
     </button>
 
@@ -73,37 +109,102 @@
 
 <script>
 
-function drawPlan(){
+function generatePlan(){
 
-    let w=document.getElementById("width").value;
-    let h=document.getElementById("height").value;
+let length=document.getElementById("plotLength").value;
+let width=document.getElementById("plotWidth").value;
 
-    let canvas=document.getElementById("plan");
-    let ctx=canvas.getContext("2d");
+let houseType=document.getElementById("houseType").value;
+let staircase=document.getElementById("staircase").value;
+let parking=document.getElementById("parking").value;
+let attachedBath=document.getElementById("attachedBath").value;
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+let canvas=document.getElementById("plan");
+let ctx=canvas.getContext("2d");
 
-    ctx.strokeRect(50,50,400,350);
+ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    ctx.strokeRect(50,50,200,150);
-    ctx.fillText("Bedroom",120,130);
+ctx.font="14px Arial";
 
-    ctx.strokeRect(250,50,200,150);
-    ctx.fillText("Bedroom",320,130);
+ctx.strokeRect(20,50,450,380);
 
-    ctx.strokeRect(50,200,400,100);
-    ctx.fillText("Hall",230,250);
+ctx.fillText(
+"Plot Size : "+length+" x "+width+" ft",
+150,
+25
+);
 
-    ctx.strokeRect(50,300,200,100);
-    ctx.fillText("Kitchen",120,350);
+if(parking.includes("Required")){
+    ctx.strokeRect(20,50,120,70);
+    ctx.fillText("Parking",50,90);
+}
 
-    ctx.strokeRect(250,300,200,100);
-    ctx.fillText("Bathroom",300,350);
+ctx.strokeRect(150,230,250,100);
+ctx.fillText("Hall",255,285);
 
-    ctx.fillText("Plot: "+w+" x "+h+" ft",170,25);
+if(houseType==="1 RK"){
+
+    ctx.strokeRect(150,80,250,120);
+    ctx.fillText("Room + Kitchen",220,145);
+
+}
+
+if(houseType==="1 BHK"){
+
+    ctx.strokeRect(20,140,180,80);
+    ctx.fillText("Bedroom",70,185);
+
+    ctx.strokeRect(220,140,180,80);
+    ctx.fillText("Kitchen",280,185);
+
+}
+
+if(houseType==="2 BHK" || houseType==="3 BHK" || houseType==="4 BHK"){
+
+    ctx.strokeRect(20,140,180,80);
+    ctx.fillText("Bedroom 1",70,185);
+
+    ctx.strokeRect(220,140,180,80);
+    ctx.fillText("Bedroom 2",270,185);
+
+}
+
+if(houseType==="3 BHK" || houseType==="4 BHK"){
+
+    ctx.strokeRect(20,340,180,70);
+    ctx.fillText("Bedroom 3",65,380);
+
+}
+
+if(houseType==="4 BHK"){
+
+    ctx.strokeRect(220,340,180,70);
+    ctx.fillText("Bedroom 4",265,380);
+
+}
+
+if(attachedBath.includes("Attached")){
+
+    ctx.strokeRect(400,230,70,100);
+    ctx.fillText("Bath",415,285);
+
+}
+
+if(staircase.includes("Inside")){
+
+    ctx.strokeRect(400,80,70,80);
+    ctx.fillText("Stairs",410,125);
+
+}
+else{
+
+    ctx.strokeRect(20,230,100,100);
+    ctx.fillText("Outside",35,285);
+
+}
+
 }
 
 </script>
-
 </body>
 </html>
