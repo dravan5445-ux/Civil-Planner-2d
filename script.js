@@ -2,16 +2,44 @@ const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
 let currentUser = null;
 let latestRequirements = null;
+let latestPlanId = null;
 let planUnlocked = false;
 let authMode = 'signup';
+let supabaseClient = null;
+const supabaseReady = () => !!(window.supabase && window.PLANORA_SUPABASE_URL &&
+  window.PLANORA_SUPABASE_ANON_KEY &&
+  !window.PLANORA_SUPABASE_URL.includes('PASTE_') &&
+  !window.PLANORA_SUPABASE_ANON_KEY.includes('PASTE_'));
+if (supabaseReady()) supabaseClient = window.supabase.createClient(
+  window.PLANORA_SUPABASE_URL, window.PLANORA_SUPABASE_ANON_KEY
+);
+async function recordEvent(eventType, metadata={}) {
+  if (!supabaseClient || !currentUser) return;
+  const { error } = await supabaseClient.from('activity_events').insert({
+    user_id: currentUser.id, event_type: eventType, metadata
+  });
+  if (error) console.warn('Activity event not saved:', error.message);
+}
+async function refreshUser() {
+  if (!supabaseClient) return;
+  const { data } = await supabaseClient.auth.getSession();
+  currentUser = data.session?.user || null;
+}
+
 const modalIds = ['authModal','builderModal','previewModal','unlockModal'];
 
 function showModal(id){const el=$('#'+id);el.classList.add('open');el.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';}
 function closeModal(id){const el=$('#'+id);el.classList.remove('open');el.setAttribute('aria-hidden','true');if(!$('.modal-backdrop.open'))document.body.style.overflow='';}
 function closeAll(){modalIds.forEach(closeModal)}
 function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),3300)}
-function getStoredUser(){try{return JSON.parse(localStorage.getItem('planoraUser')||'null')}catch{return null}}
-function beginPlan(){currentUser=getStoredUser();if(!currentUser){authMode='signup';updateAuthMode();showModal('authModal');toast('Create an account to start your floor plan.');return}showModal('builderModal')}
+async function beginPlan(){
+  if (!supabaseClient) { toast('Add your Supabase URL and publishable key in supabase-config.js first.'); authMode='signup'; updateAuthMode(); showModal('authModal'); return; }
+  await refreshUser();
+  if (!currentUser) { authMode='signup'; updateAuthMode(); showModal('authModal'); toast('Create an account or log in to start.'); return; }
+  await recordEvent('open_plan_builder');
+  showModal('builderModal');
+}
+refreshUser();
 ['startBtn','priceStartBtn','footerStartBtn'].forEach(id=>$('#'+id).addEventListener('click',beginPlan));
 $('#loginBtn').addEventListener('click',()=>{authMode='login';updateAuthMode();showModal('authModal')});
 $('#signupBtn').addEventListener('click',()=>{authMode='signup';updateAuthMode();showModal('authModal')});
@@ -22,11 +50,60 @@ $$('.modal-backdrop').forEach(back=>back.addEventListener('click',e=>{if(e.targe
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll()});
 $$('[data-auth]').forEach(b=>b.addEventListener('click',()=>{authMode=b.dataset.auth;updateAuthMode()}));
 function updateAuthMode(){const signup=authMode==='signup';$$('[data-auth]').forEach(b=>b.classList.toggle('active',b.dataset.auth===authMode));$('#authTitle').innerHTML=signup?`Let's get you <em>started.</em>`:`Welcome <em>back.</em>`;$('#authName').closest('label').style.display=signup?'block':'none';$('#authName').required=signup;$('#authPassword').autocomplete=signup?'new-password':'current-password';$('#authSubmit').textContent=signup?'Create my account ↗':'Log in ↗';}
-$('#authForm').addEventListener('submit',e=>{e.preventDefault();const name=$('#authName').value.trim(),email=$('#authEmail').value.trim().toLowerCase(),password=$('#authPassword').value;if(authMode==='signup'){const user={name,email,password};localStorage.setItem('planoraUser',JSON.stringify(user));currentUser=user;toast('Account created in demo mode. Welcome!')}else{const saved=getStoredUser();if(!saved||saved.email!==email||saved.password!==password){toast('Demo login not found. Create an account in this browser first.');return}currentUser=saved;toast('Welcome back!')}closeModal('authModal');showModal('builderModal')});
+$('#authForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!supabaseClient) { toast('Supabase is not configured in supabase-config.js.'); return; }
+  const signup = authMode === 'signup';
+  const name = $('#authName').value.trim();
+  const email = $('#authEmail').value.trim().toLowerCase();
+  const password = $('#authPassword').value;
+  $('#authSubmit').disabled = true;
+  try {
+    if (signup) {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email, password, options: { data: { full_name: name } }
+      });
+      if (error) throw error;
+      currentUser = data.user;
+      if (!data.session) {
+        toast('Account created. Confirm your email, then log in.');
+        authMode = 'login'; updateAuthMode(); return;
+      }
+      await recordEvent('registration', { method: 'email' });
+      toast('Account created successfully.');
+    } else {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      currentUser = data.user;
+      await recordEvent('login', { method: 'email' });
+      toast('Welcome back!');
+    }
+    closeModal('authModal'); showModal('builderModal');
+  } catch (err) {
+    toast(err.message || 'Authentication failed. Please try again.');
+  } finally {
+    $('#authSubmit').disabled = false;
+    updateAuthMode();
+  }
+});
 $$('.choice-card input').forEach(input=>input.addEventListener('change',()=>{$$('.choice-card').forEach(card=>card.classList.toggle('selected',card.contains(input)&&input.checked))}));
 
-$('#requirementsForm').addEventListener('submit',e=>{e.preventDefault();const fd=new FormData(e.currentTarget);latestRequirements=Object.fromEntries(fd.entries());['parking','stairs','elderly','extra'].forEach(k=>latestRequirements[k]=fd.has(k));if(Number(latestRequirements.width)<=0||Number(latestRequirements.length)<=0){toast('Please enter valid plot dimensions.');return}renderPreview(latestRequirements);closeModal('builderModal');showModal('previewModal')});
+$('#requirementsForm').addEventListener('submit',e=>{e.preventDefault();const fd=new FormData(e.currentTarget);latestRequirements=Object.fromEntries(fd.entries());['parking','stairs','elderly','extra'].forEach(k=>latestRequirements[k]=fd.has(k));if(Number(latestRequirements.width)<=0||Number(latestRequirements.length)<=0){toast('Please enter valid plot dimensions.');return}renderPreview(latestRequirements);closeModal('builderModal');showModal('previewModal');savePlan(latestRequirements)});
 
+async function savePlan(requirements) {
+  if (!supabaseClient || !currentUser) return;
+  const { data, error } = await supabaseClient.from('floor_plans').insert({
+    user_id: currentUser.id,
+    title: `${requirements.bhk} · ${requirements.width}m × ${requirements.length}m`,
+    requirements,
+    preview_svg: $('#generatedPlan').outerHTML,
+    status: 'preview'
+  }).select('id').single();
+  if (error) { console.error(error); toast('Could not save plan. Check database setup.'); return; }
+  latestPlanId = data.id;
+  await recordEvent('plan_generated', { floor_plan_id: latestPlanId, bhk: requirements.bhk });
+  toast('Plan and requirements saved.');
+}
 function renderPreview(r){
  const width=Number(r.width),length=Number(r.length),bhk=parseInt(r.bhk,10)||2;
  $('#previewTitle').innerHTML=`Your ${escapeHtml(r.bhk)} home, <em>taking shape.</em>`;
@@ -89,9 +166,10 @@ function drawPlan(r,dimensions){
 function roomText(text,x,y,size=10){return `<text x="${x}" y="${y}" fill="#3b5746" font-family="Arial,sans-serif" font-size="${size}" font-weight="700" text-anchor="middle">${escapeHtml(text)}</text>`}
 $('#editRequirements').addEventListener('click',()=>{closeModal('previewModal');showModal('builderModal')});
 $('#unlockBtn').addEventListener('click',()=>{if(planUnlocked)downloadPlan();else showModal('unlockModal')});
-$('#demoPayBtn').addEventListener('click',()=>{planUnlocked=true;closeModal('unlockModal');drawPlan(latestRequirements,true);const button=$('#unlockBtn');button.textContent='Download dimensioned plan ↓';button.classList.remove('btn-dark');button.classList.add('btn-lime');button.onclick=downloadPlan;toast('Demo unlock successful. No payment was taken.')});
-function downloadPlan(){
+$('#demoPayBtn').addEventListener('click',async()=>{planUnlocked=true;closeModal('unlockModal');drawPlan(latestRequirements,true);const button=$('#unlockBtn');button.textContent='Download concept plan ↓';button.classList.remove('btn-dark');button.classList.add('btn-lime');await recordEvent('demo_unlock_clicked',{floor_plan_id:latestPlanId,amount_inr:50,payment_simulated:true});toast('Demo only. No payment was taken.')});
+async function downloadPlan(){
  if(!latestRequirements)return;
+ await recordEvent('plan_downloaded',{floor_plan_id:latestPlanId,format:'svg',demo_unlocked:planUnlocked});
  const svg=$('#generatedPlan').cloneNode(true);svg.setAttribute('xmlns','http://www.w3.org/2000/svg');svg.setAttribute('width','1000');svg.setAttribute('height','860');
  const svgText=new XMLSerializer().serializeToString(svg);const blob=new Blob([svgText],{type:'image/svg+xml;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='planora-concept-floor-plan.svg';a.click();URL.revokeObjectURL(url);toast('Plan downloaded as SVG. You can print it or save it as PDF.');
 }
